@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>文字時光機：年度代表字抽籤 (音效加強版)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;700;900&display=swap');
+
+        body {
+            font-family: 'Noto Sans TC', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            height: 100vh;
+            margin: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+        }
+
+        .wheel-container {
+            position: relative;
+            width: 550px;
+            height: 550px;
+            max-width: 90vw;
+            max-height: 90vw;
+        }
+
+        #wheel {
+            width: 100%;
+            height: 100%;
+            border-radius: 50%;
+            border: 12px solid rgba(255, 255, 255, 0.9);
+            box-shadow: 0 0 40px rgba(0,0,0,0.5);
+        }
+
+        .pointer {
+            position: absolute;
+            top: -25px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 40px;
+            height: 60px;
+            background: #ff4757;
+            clip-path: polygon(50% 100%, 0 0, 100% 0);
+            z-index: 20;
+            filter: drop-shadow(0 4px 6px rgba(0,0,0,0.3));
+        }
+
+        .center-dot {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 60px;
+            height: 60px;
+            background: white;
+            border-radius: 50%;
+            z-index: 15;
+            box-shadow: 0 0 20px rgba(0,0,0,0.3);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 900;
+            color: #764ba2;
+            font-size: 16px;
+            border: 4px solid #f1f2f6;
+        }
+
+        #modal {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.85);
+            z-index: 100;
+            justify-content: center;
+            align-items: center;
+            backdrop-filter: blur(8px);
+        }
+
+        .modal-content {
+            background: white;
+            padding: 2.5rem;
+            border-radius: 2.5rem;
+            text-align: center;
+            max-width: 480px;
+            width: 90%;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+            transform: scale(0.9);
+            animation: popIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+        }
+
+        @keyframes popIn { to { transform: scale(1); } }
+
+        .big-char {
+            font-size: 9rem;
+            font-weight: 900;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin: 0.5rem 0;
+            line-height: 1.1;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="flex flex-col items-center">
+        <div class="text-center mb-10">
+            <h1 class="text-white text-4xl md:text-5xl font-black tracking-widest drop-shadow-2xl mb-2">
+                2025 文字時光機
+            </h1>
+            <p class="text-purple-200 opacity-80 font-bold">轉動輪盤，發現屬於你的年度代表字</p>
+        </div>
+        
+        <div class="wheel-container">
+            <div class="pointer"></div>
+            <div class="center-dot">START</div>
+            <canvas id="wheel"></canvas>
+        </div>
+
+        <button id="spinBtn" class="mt-12 bg-gradient-to-r from-yellow-400 to-orange-500 hover:from-yellow-300 hover:to-orange-400 text-purple-900 font-black py-5 px-20 rounded-full text-3xl shadow-2xl transform transition active:scale-95 hover:scale-105 ring-8 ring-white/10">
+            啟動輪盤！
+        </button>
+
+        <p class="text-white/40 mt-8 text-xs tracking-[0.3em] uppercase">18 Keywords • Interactive Experience</p>
+    </div>
+
+    <!-- 中獎彈窗 -->
+    <div id="modal">
+        <div class="modal-content">
+            <h2 class="text-sm text-gray-400 font-black uppercase tracking-[0.2em] mb-2">Your Result</h2>
+            <div id="resultChar" class="big-char">?</div>
+            <h3 id="resultTitle" class="text-3xl font-black text-gray-800 mb-4">標題</h3>
+            <p id="resultDesc" class="text-gray-600 mb-10 text-lg leading-relaxed text-left border-l-4 border-purple-200 pl-4">描述...</p>
+            <button onclick="closeModal()" class="w-full bg-gradient-to-r from-purple-600 to-indigo-700 text-white py-4 rounded-2xl font-black text-xl hover:shadow-2xl transition transform hover:-translate-y-1">
+                我知道了
+            </button>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('wheel');
+        const ctx = canvas.getContext('2d');
+        const spinBtn = document.getElementById('spinBtn');
+        const modal = document.getElementById('modal');
+        const resultChar = document.getElementById('resultChar');
+        const resultTitle = document.getElementById('resultTitle');
+        const resultDesc = document.getElementById('resultDesc');
+
+        const words = [
+            { char: '破', title: '突破', desc: '打破舒適圈，今年是你嘗試新挑戰的一年。' },
+            { char: '穩', title: '穩健', desc: '在變動的環境中，你學會了站穩腳步，按部就班。' },
+            { char: '忙', title: '充實', desc: '行程滿滿，但每一件事都讓你累積了新的經驗值。' },
+            { char: '智', title: '智慧共生', desc: '這一年 AI 走進學習生活。你學會與技術協作，發揮獨特的判斷力與創造力。' },
+            { char: '脆', title: '真實連結', desc: '在 Threads 時代，你學會分享心情與卸下武裝，從真實互動中找到共鳴。' },
+            { char: '萌', title: '萌芽', desc: '一個新的興趣或夢想正在心中悄悄發芽。' },
+            { char: '驚', title: '驚喜', desc: '生活中發生了意想不到的好事，讓你大開眼界。' },
+            { char: '衝', title: '衝刺', desc: '充滿行動力，一旦設定目標就會全力以赴。' },
+            { char: '靜', title: '沉澱', desc: '在喧鬧中保有自己的空間，安靜地思考未來。' },
+            { char: '變', title: '改變', desc: '從國小到國中，你發現自己變得更成熟了。' },
+            { char: '勇', title: '勇氣', desc: '面對不熟悉的學科或挑戰，你拿出了最大的勇氣。' },
+            { char: '樂', title: '樂觀', desc: '你是大家的開心果，總是能看到事情好的一面。' },
+            { char: '韌', title: '韌性', desc: '像雜草一樣，遇到挫折能迅速恢復並繼續生長。' },
+            { char: '網', title: '連結', desc: '在網路上或現實中，建立了意想不到的人際連結。' },
+            { char: '創', title: '創造', desc: '你發揮了獨特的創意，解決了問題或製作了作品。' },
+            { char: '真', title: '真誠', desc: '不隨波逐流，你勇敢地做最真實的自己。' },
+            { char: '暖', title: '溫暖', desc: '你的一句話或舉動，曾溫暖了身邊同學的心。' },
+            { char: '夢', title: '夢想', desc: '即使課業繁重，你依然沒有忘記心中那個小小的夢。' }
+        ];
+
+        const colors = [
+            '#FF6B6B', '#4ECDC4', '#FFE66D', '#FF9FF3', '#54A0FF', '#5F27CD', 
+            '#48DBFB', '#1DD1A1', '#F368E0', '#FF9F43', '#00D2D3', '#8395A7', 
+            '#C4E538', '#2E86DE', '#FDA7DF', '#D980FA', '#B53471', '#F79F1F'
+        ];
+        
+        let currentRotation = 0;
+        let isSpinning = false;
+        let audioCtx;
+
+        // 初始化音訊上下文
+        function initAudio() {
+            if (!audioCtx) {
+                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            }
+        }
+
+        // 播放點擊音效 (撥動聲)
+        function playTickSound() {
+            initAudio();
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(800, audioCtx.currentTime);
+            osc.frequency.exponentialRampToValueAtTime(100, audioCtx.currentTime + 0.05);
+            gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.05);
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            osc.start();
+            osc.stop(audioCtx.currentTime + 0.05);
+        }
+
+        // 播放成功音效
+        function playSuccessSound() {
+            initAudio();
+            const notes = [523.25, 659.25, 783.99, 1046.50]; // C-E-G-C
+            notes.forEach((freq, i) => {
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                osc.type = 'triangle';
+                osc.frequency.setValueAtTime(freq, audioCtx.currentTime + i * 0.1);
+                gain.gain.setValueAtTime(0.1, audioCtx.currentTime + i * 0.1);
+                gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + i * 0.1 + 0.4);
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+                osc.start(audioCtx.currentTime + i * 0.1);
+                osc.stop(audioCtx.currentTime + i * 0.1 + 0.4);
+            });
+        }
+
+        function initWheel() {
+            canvas.width = 550;
+            canvas.height = 550;
+            drawWheel();
+        }
+
+        function drawWheel() {
+            const centerX = canvas.width / 2;
+            const centerY = canvas.height / 2;
+            const radius = canvas.width / 2;
+            const sliceAngle = (2 * Math.PI) / words.length;
+
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            words.forEach((word, i) => {
+                const angle = i * sliceAngle;
+                ctx.beginPath();
+                ctx.fillStyle = colors[i % colors.length];
+                ctx.moveTo(centerX, centerY);
+                ctx.arc(centerX, centerY, radius, angle, angle + sliceAngle);
+                ctx.closePath();
+                ctx.fill();
+
+                ctx.save();
+                ctx.translate(centerX, centerY);
+                ctx.rotate(angle + sliceAngle / 2);
+                ctx.textAlign = 'right';
+                ctx.fillStyle = (['#FFE66D', '#C4E538', '#48DBFB'].includes(colors[i % colors.length])) ? '#4a2c6d' : 'white';
+                ctx.font = 'bold 26px "Noto Sans TC"';
+                ctx.fillText(word.char, radius - 40, 10);
+                ctx.restore();
+            });
+        }
+
+        spinBtn.addEventListener('click', () => {
+            if (isSpinning) return;
+            initAudio(); // 確保使用者互動後解鎖音訊
+            
+            isSpinning = true;
+            const spins = 5 + Math.random() * 5; // 轉 5 到 10 圈
+            const degrees = spins * 360;
+            const duration = 5000; // 5 秒
+            const startRotation = currentRotation;
+            const totalTargetRotation = startRotation + degrees;
+            const startTime = performance.now();
+
+            let lastTickAngle = 0;
+            const sliceSize = 360 / words.length;
+
+            function animate(now) {
+                const elapsed = now - startTime;
+                const progress = Math.min(elapsed / duration, 1);
+                
+                // 使用 Cubic Out 減速公式
+                const easeOut = 1 - Math.pow(1 - progress, 3);
+                const currentTotalRotation = startRotation + (degrees * easeOut);
+                
+                canvas.style.transform = `rotate(${currentTotalRotation}deg)`;
+
+                // 音效邏輯：計算每經過一格播放一次聲音
+                const currentAngle = currentTotalRotation % 360;
+                if (Math.abs(currentTotalRotation - lastTickAngle) >= sliceSize) {
+                    playTickSound();
+                    lastTickAngle = currentTotalRotation;
+                }
+
+                if (progress < 1) {
+                    requestAnimationFrame(animate);
+                } else {
+                    currentRotation = currentTotalRotation;
+                    isSpinning = false;
+                    setTimeout(showResult, 500);
+                }
+            }
+
+            requestAnimationFrame(animate);
+        });
+
+        function showResult() {
+            const normalizedRotation = (currentRotation % 360);
+            const sliceSize = 360 / words.length;
+            // 修正索引計算
+            const actualIndex = Math.floor(((360 - (normalizedRotation % 360) + 270) % 360) / sliceSize);
+            const winner = words[actualIndex];
+
+            resultChar.innerText = winner.char;
+            resultTitle.innerText = winner.title;
+            resultDesc.innerText = winner.desc;
+            modal.style.display = 'flex';
+            playSuccessSound();
+        }
+
+        function closeModal() {
+            modal.style.display = 'none';
+        }
+
+        window.onload = initWheel;
+    </script>
+</body>
+</html>
